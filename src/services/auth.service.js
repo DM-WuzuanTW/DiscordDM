@@ -120,10 +120,29 @@ class AuthService {
                 this.logger.info(`設定為 out-of-band(oob) 模式，跳過開啟本地伺服器。`);
             }
 
-            // 監聽來自使用者的手動輸入網址，防止防他們使用 VPS 無法 redirect back 的情況
-            discordService.client.on('messageCreate', async (message) => {
-                if (message.author.id === targetUserId && message.channel.isDMBased()) {
-                    const text = message.content.trim();
+            discordService.client.on('interactionCreate', async (interaction) => {
+                if (interaction.user.id !== targetUserId) return;
+
+                if (interaction.isButton() && interaction.customId === 'auth_manual_input') {
+                    const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder } = require('discord.js');
+
+                    const modal = new ModalBuilder()
+                        .setCustomId('auth_modal')
+                        .setTitle('手動輸入授權網址或代碼');
+
+                    const input = new TextInputBuilder()
+                        .setCustomId('auth_code_input')
+                        .setLabel("請貼上包含 code=... 的 localhost 網址")
+                        .setStyle(TextInputStyle.Paragraph)
+                        .setPlaceholder("http://localhost:3000/?code=4/0AeanS0...")
+                        .setRequired(true);
+
+                    modal.addComponents(new ActionRowBuilder().addComponents(input));
+                    await interaction.showModal(modal);
+                }
+
+                if (interaction.isModalSubmit() && interaction.customId === 'auth_modal') {
+                    const text = interaction.fields.getTextInputValue('auth_code_input').trim();
                     let code = null;
                     if (text.startsWith('http')) {
                         try {
@@ -135,6 +154,7 @@ class AuthService {
                     }
 
                     if (code) {
+                        await interaction.deferReply({ ephemeral: true });
                         try {
                             const { tokens } = await oAuth2Client.getToken(code);
                             oAuth2Client.setCredentials(tokens);
@@ -144,11 +164,28 @@ class AuthService {
                                 for (const conn of connections) conn.destroy();
                             }
 
-                            await message.reply('✅ **Google 帳號授權手動綁定成功！** 系統已正式開始運作，會自動監控您的信箱。');
+                            await interaction.editReply('✅ **Google 帳號授權手動綁定成功！** 系統已正式開始運作，會自動監控您的信箱。');
+
+                            // 更新原本的按鈕為已完成
+                            const message = interaction.message;
+                            if (message && message.components) {
+                                const newComponents = message.components.map(row => {
+                                    const newRow = row.toJSON();
+                                    newRow.components = newRow.components.map(comp => {
+                                        comp.disabled = true;
+                                        return comp;
+                                    });
+                                    return newRow;
+                                });
+                                await message.edit({ components: newComponents }).catch(() => { });
+                            }
+
                             resolve(oAuth2Client);
                         } catch (err) {
-                            await message.reply('❌ 授權碼無效或已過期，請重新索取。');
+                            await interaction.editReply('❌ **綁定失敗：** 授權碼無效或已過期，請重新索取。');
                         }
+                    } else {
+                        await interaction.reply({ content: '❌ 無法從您的輸入中解析出授權碼。', ephemeral: true });
                     }
                 }
             });
