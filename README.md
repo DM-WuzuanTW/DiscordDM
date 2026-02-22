@@ -18,28 +18,28 @@ DiscordDM 是一個強大的 Node.js 基礎應用程式，能夠即時監控您�
 ## 安裝與執行
 
 ### 1. 複製專案
-\`\`\`bash
+```bash
 git clone https://github.com/DM-WuzuanTW/DiscordDM.git
 cd DiscordDM
-\`\`\`
+```
 
 ### 2. 安裝依賴
-\`\`\`bash
+```bash
 npm install
-\`\`\`
+```
 
 ### 3. 設定環境變數
 複製範例環境變數檔並填寫：
-\`\`\`bash
+```bash
 cp .env.example .env
-\`\`\`
+```
 
 在 `.env` 中填寫您的設定：
-\`\`\`env
+```env
 DISCORD_TOKEN=您的_DISCORD_BOT_TOKEN
 DISCORD_TARGET_USER_ID=要接收通知的您的_DC_使用者ID
 GMAIL_POLLING_INTERVAL_MINUTES=1
-\`\`\`
+```
 
 ### 4. 設定 Google API 權限
 1. 在 Google Cloud Console 新增一個專案。
@@ -47,9 +47,9 @@ GMAIL_POLLING_INTERVAL_MINUTES=1
 3. 建立 OAuth 客戶端 ID (桌面應用程式)，下載 JSON 檔案並將其命名為 `credentials.json`，然後放到此專案的根目錄下。
 
 ### 5. 啟動應用程式
-\`\`\`bash
+```bash
 npm run start
-\`\`\`
+```
 第一次啟動時，應用程式會請求您的授權，您需要開啟它提示的網址並選擇您的 Google 帳戶來進行授權，授權成功後會自動產生 `token.json` 於根目錄，未來便不需再次認證。
 
 ### 常見問題排解 (Troubleshooting)
