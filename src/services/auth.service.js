@@ -46,7 +46,6 @@ class AuthService {
         const keys = JSON.parse(content);
         const key = keys.installed || keys.web;
 
-        // 強制使用 OOB 模式，避免佔用伺服器 port 並解決不同環境的連線痛點
         const redirectUri = 'urn:ietf:wg:oauth:2.0:oob';
 
         const oAuth2Client = new google.auth.OAuth2(
