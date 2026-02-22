@@ -85,6 +85,7 @@ class DiscordService {
             this.logger.info(`已發送通知給 ${user.tag}`);
         } catch (error) {
             this.logger.error('發送私訊失敗', error);
+            throw error;
         }
     }
 }

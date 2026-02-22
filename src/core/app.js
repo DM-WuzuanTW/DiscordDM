@@ -61,9 +61,25 @@ class GmailNotifierApp {
             this.logger.info(`發現 ${newMessages.length} 封新未讀郵件`);
             for (const msg of newMessages) {
                 const details = await this.gmailService.getMessageDetails(msg.id);
-                await this.discordService.sendDM(this.config.discord.targetUserId, details);
-                await this.storage.add(msg.id);
-                await new Promise(r => setTimeout(r, 1000));
+                try {
+                    await this.discordService.sendDM(this.config.discord.targetUserId, details);
+                    await this.storage.add(msg.id);
+                    await new Promise(r => setTimeout(r, 1000));
+                } catch (sendError) {
+                    this.logger.error(`發送通知失敗 (ID: ${msg.id})，將在 3 分鐘後重試...`);
+                    setTimeout(async () => {
+                        this.logger.info(`🔄 開始重試發送 (ID: ${msg.id})`);
+                        try {
+                            await this.discordService.sendDM(this.config.discord.targetUserId, details);
+                            await this.storage.add(msg.id);
+                            this.logger.info(`✅ 成功重發通知 (ID: ${msg.id})`);
+                        } catch (err) {
+                            this.logger.error(`❌ 重發通知依然失敗 (ID: ${msg.id})`, err);
+                            // 如果重發也失敗，它依然沒有存進 storage，下個輪詢會再次抓到，
+                            // 但為了避免阻塞，讓下次輪詢自然處理即可。
+                        }
+                    }, 3 * 60 * 1000); // 3 分鐘
+                }
             }
         } catch (error) {
             this.logger.error('執行監測任務時發生錯誤', error);
