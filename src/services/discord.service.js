@@ -89,6 +89,26 @@ class DiscordService {
         }
     }
 
+    async sendUploadCredentialsMessage(userId) {
+        if (!this.isReady) {
+            this.logger.warn('Bot 尚未就緒，無法發送訊息');
+            return;
+        }
+        try {
+            const user = await this.client.users.fetch(userId);
+            if (!user) {
+                this.logger.error(`找不到使用者 ID: ${userId}`);
+                return;
+            }
+            const messageOptions = Formatter.createUploadCredentialsMessage();
+            await user.send(messageOptions);
+            this.logger.info(`已發送憑證索取通知給 ${user.tag}`);
+        } catch (error) {
+            this.logger.error('發送憑證索取通知失敗', error);
+            throw error;
+        }
+    }
+
     async sendDM(userId, emailData) {
         if (!this.isReady) {
             this.logger.warn('Bot 尚未就緒，無法發送訊息');

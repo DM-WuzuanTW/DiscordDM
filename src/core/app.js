@@ -21,7 +21,7 @@ class GmailNotifierApp {
             this.discordService = new DiscordService(config.discord);
             await this.discordService.init();
 
-            const authClient = await authService.getClient(this.discordService, config.discord.targetUserId);
+            const authClient = await authService.getClient(this.discordService, config.discord.targetUserId, this.storage);
             this.gmailService = new GmailService(authClient);
             this.discordService.onMarkAsRead = async (id) => {
                 await this.gmailService.markAsRead(id);

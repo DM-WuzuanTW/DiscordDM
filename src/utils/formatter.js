@@ -34,6 +34,24 @@ class MessageFormatter {
         return { embeds: [embed], components: [row] };
     }
 
+    static createUploadCredentialsMessage() {
+        const embed = new EmbedBuilder()
+            .setColor(0xF4B400)
+            .setTitle('⚙️ 機器人初始設定：需要 credentials.json')
+            .setDescription('我目前沒有存取 Google API 的權限，請前往 Google Cloud Console 建立「桌面應用程式」的 OAuth 2.0 用戶端 ID，並下載 `credentials.json` 檔案。')
+            .addFields(
+                { name: '如何提供', value: '請直接在**這個對話框中**，將 `credentials.json` 檔案拖曳上傳/附加給我即可。' },
+                { name: '為保障安全', value: '您上傳的檔案內容將會進行**高強度加密**並存入本地資料庫，程式不會直接儲存明碼檔案。' }
+            )
+            .setFooter({
+                text: 'Gmail 通知機器人',
+                iconURL: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico'
+            })
+            .setTimestamp();
+
+        return { embeds: [embed] };
+    }
+
     static createAuthMessage(authUrl) {
         const embed = new EmbedBuilder()
             .setColor(0x4285F4)

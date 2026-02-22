@@ -44,17 +44,19 @@ GMAIL_POLLING_INTERVAL_MINUTES=1
 ### 4. 設定 Google API 權限
 1. 在 Google Cloud Console 新增一個專案。
 2. 啟用 **Gmail API**。
-3. 建立 OAuth 客戶端 ID (桌面應用程式)，下載 JSON 檔案並將其命名為 `credentials.json`，然後放到此專案的根目錄下。
+3. 建立 OAuth 客戶端 ID (桌面應用程式)，下載 JSON 檔案並備用。
 
 ### 5. 啟動應用程式
 ```bash
 npm run start
 ```
-第一次啟動時，應用程式會請求您的授權，您需要開啟它提示的網址並選擇您的 Google 帳戶來進行授權，授權成功後會自動產生 `token.json` 於根目錄，未來便不需再次認證。
+應用程式將會啟動，並且此時會先登入 Discord 您設定的 Bot 機器人。
+- **首次設定**：機器人會發送私訊，請直接將剛剛下載的手把手 `credentials.json` 檔案從電腦拖曳**傳送給該機器人**，機器人收到後會以最高規格**使用您的 Discord Token 進行金鑰加密**，安全寫入本地輕量伺服器中並把明碼丟棄。
+- 接著，機器人會傳送一個 Google 授權的認證連結。點開核准後，複製那一長串授權碼並依照機器人的提示貼上，從頭到尾完全在您的 Discord 可以遠端無痛完成佈署。
 
 ### 常見問題排解 (Troubleshooting)
 - **遇到 `403 access_denied` 或未核准測試人員：** 如果您的 Google Cloud 專案仍在「測試階段」，請確保您的個人 Gmail 地址已經被加入 OAuth 同意畫面的「測試使用者 (Test users)」清單中。
-- **重新認證：** 若欲更換綁定的帳號或權限過期，直接刪除 `token.json` 後再度啟動 `npm run start` 即可重新授權。
+- **重新認證：** 若欲更換綁定的帳號或權限過期，或者想更換 API 金鑰，請先停止應用程式，刪除 `processed_ids.sqlite` 資料庫後，重新啟動 `npm run start` 即可觸發重新授權或上傳。
 
 ## 技術棧
 - `discord.js`: 與 Discord API 的無縫連線與互動。

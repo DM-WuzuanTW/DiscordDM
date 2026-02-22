@@ -22,7 +22,11 @@ class StorageService {
                 CREATE TABLE IF NOT EXISTS processed_ids (
                     id TEXT PRIMARY KEY,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                )
+                );
+                CREATE TABLE IF NOT EXISTS app_settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                );
             `);
             await this.migrateLegacyData();
             const row = await this.db.get('SELECT COUNT(*) as count FROM processed_ids');
@@ -72,6 +76,50 @@ class StorageService {
             await this.db.run('INSERT OR IGNORE INTO processed_ids (id) VALUES (?)', [id]);
         } catch (err) {
             this.logger.error('新增紀錄失敗', err);
+        }
+    }
+
+    async getSetting(key) {
+        try {
+            const row = await this.db.get('SELECT value FROM app_settings WHERE key = ?', [key]);
+            if (!row || !row.value) return null;
+            return this._decryptSession(row.value);
+        } catch (err) {
+            this.logger.error(`讀取設定失敗 (${key})`, err);
+            return null;
+        }
+    }
+
+    async setSetting(key, value) {
+        try {
+            const encryptedStr = this._decryptSession(value, true);
+            await this.db.run(`INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=?`,
+                [key, encryptedStr, encryptedStr]);
+        } catch (err) {
+            this.logger.error(`寫入設定失敗 (${key})`);
+        }
+    }
+
+    _decryptSession(text, isEncrypt = false) {
+        const crypto = require('crypto');
+        const tokenStr = process.env.DISCORD_TOKEN || 'fallback_secret_key_if_no_discord_token_provided';
+        const key = crypto.createHash('sha256').update(tokenStr).digest();
+        const algorithm = 'aes-256-cbc';
+
+        if (isEncrypt) {
+            const iv = crypto.randomBytes(16);
+            const cipher = crypto.createCipheriv(algorithm, key, iv);
+            let encrypted = cipher.update(text, 'utf8', 'hex');
+            encrypted += cipher.final('hex');
+            return iv.toString('hex') + ':' + encrypted;
+        } else {
+            const parts = text.split(':');
+            const iv = Buffer.from(parts.shift(), 'hex');
+            const encryptedText = parts.join(':');
+            const decipher = crypto.createDecipheriv(algorithm, key, iv);
+            let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+            decrypted += decipher.final('utf8');
+            return decrypted;
         }
     }
 }
