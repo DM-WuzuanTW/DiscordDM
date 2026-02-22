@@ -18,10 +18,12 @@ class DiscordService {
     }
 
     async init() {
-        this.client.once('ready', () => {
+        this.client.once(Events.ClientReady, () => {
             this.logger.info(`Bot 已登入: ${this.client.user.tag}`);
             this.isReady = true;
+            this.updatePresence('等待授權與設定...', 'dnd'); // 預設狀態
         });
+
         this.client.on(Events.InteractionCreate, async interaction => {
             if (!interaction.isButton()) return;
             try {
@@ -127,6 +129,15 @@ class DiscordService {
             this.logger.error('發送私訊失敗', error);
             throw error;
         }
+    }
+
+    updatePresence(text, status = 'online') {
+        if (!this.isReady) return;
+        const { ActivityType } = require('discord.js');
+        this.client.user.setPresence({
+            activities: [{ name: text, type: ActivityType.Watching }],
+            status: status,
+        });
     }
 }
 

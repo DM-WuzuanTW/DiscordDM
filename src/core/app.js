@@ -38,6 +38,7 @@ class GmailNotifierApp {
     startPolling() {
         this.isRunning = true;
         const intervalMinutes = this.config.gmail.pollingIntervalMinutes || 1;
+        this.discordService.updatePresence(`信箱 (${intervalMinutes}m/次)`, 'online');
         this.logger.info(`開始監測任務，頻率: 每 ${intervalMinutes} 分鐘`);
         this.runTask();
         setInterval(() => this.runTask(), intervalMinutes * 60 * 1000);
