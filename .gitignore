@@ -1,0 +1,7 @@
+node_modules/
+.env
+token.json
+credentials.json
+processed_ids.sqlite
+*.sqlite-journal
+*.log
