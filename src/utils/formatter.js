@@ -33,6 +33,31 @@ class MessageFormatter {
 
         return { embeds: [embed], components: [row] };
     }
+
+    static createAuthMessage(authUrl) {
+        const embed = new EmbedBuilder()
+            .setColor(0x4285F4)
+            .setTitle('🔐 需要您的 Google 授權')
+            .setDescription('首次啟動或憑證已過期，請點擊下方按鈕進行授權。')
+            .addFields(
+                { name: '如果您在遠端 (VPS) 執行', value: '授權後重新導向至 localhost 會失敗，顯示「無法連線」。\n請將該失敗網頁的**完整網址**複製下來，直接在這個對話中回覆給我即可！' }
+            )
+            .setFooter({
+                text: 'Gmail 通知機器人',
+                iconURL: 'https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico'
+            })
+            .setTimestamp();
+
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setLabel('點擊前往授權頁面')
+                    .setStyle(ButtonStyle.Link)
+                    .setURL(authUrl)
+            );
+
+        return { embeds: [embed], components: [row] };
+    }
 }
 
 module.exports = MessageFormatter;

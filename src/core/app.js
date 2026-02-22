@@ -18,14 +18,15 @@ class GmailNotifierApp {
             this.config = config;
             this.storage = new StorageService();
             await this.storage.init();
-            const authClient = await authService.getClient();
-            this.gmailService = new GmailService(authClient);
             this.discordService = new DiscordService(config.discord);
+            await this.discordService.init();
+
+            const authClient = await authService.getClient(this.discordService, config.discord.targetUserId);
+            this.gmailService = new GmailService(authClient);
             this.discordService.onMarkAsRead = async (id) => {
                 await this.gmailService.markAsRead(id);
                 this.logger.info(`使用者透過 Discord 標記已讀: ${id}`);
             };
-            await this.discordService.init();
             this.logger.info('所有服務初始化完成');
             this.startPolling();
         } catch (error) {

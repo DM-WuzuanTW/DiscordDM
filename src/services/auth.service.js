@@ -1,6 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { authenticate } = require('@google-cloud/local-auth');
+const http = require('http');
+const url = require('url');
 const { google } = require('googleapis');
 const Logger = require('../utils/logger');
 
@@ -16,14 +17,14 @@ class AuthService {
         this.client = null;
     }
 
-    async getClient() {
+    async getClient(discordService, targetUserId) {
         if (this.client) return this.client;
         this.client = await this._loadSavedCredentialsIfExist();
         if (this.client) {
             return this.client;
         }
         this.logger.info('無有效 Token，啟動新認證流程...');
-        this.client = await this._authenticate();
+        this.client = await this._authenticate(discordService, targetUserId);
         if (this.client.credentials) {
             await this._saveCredentials(this.client);
         }
@@ -40,12 +41,103 @@ class AuthService {
         }
     }
 
-    async _authenticate() {
-        const client = await authenticate({
-            scopes: this.SCOPES,
-            keyfilePath: this.CREDENTIALS_PATH,
+    async _authenticate(discordService, targetUserId) {
+        const content = await fs.readFile(this.CREDENTIALS_PATH);
+        const keys = JSON.parse(content);
+        const key = keys.installed || keys.web;
+
+        // 通常 Google OAuth 客戶端桌面版會有這個 redirect_uris
+        const redirectUri = (key.redirect_uris && key.redirect_uris.length > 0) ? key.redirect_uris[0] : 'http://localhost:3000/oauth2callback';
+        const urlObj = new url.URL(redirectUri);
+        const port = urlObj.port || 3000;
+
+        const oAuth2Client = new google.auth.OAuth2(
+            key.client_id,
+            key.client_secret,
+            redirectUri
+        );
+
+        const authorizeUrl = oAuth2Client.generateAuthUrl({
+            access_type: 'offline',
+            prompt: 'consent',
+            scope: this.SCOPES,
         });
-        return client;
+
+        // 透過 Discord 發送認證連結
+        await discordService.sendAuthMessage(targetUserId, authorizeUrl);
+        this.logger.info('已將 Google 授權連結發送至您的 Discord 私訊中，請前往點擊。');
+
+        return new Promise((resolve, reject) => {
+            const connections = new Set();
+
+            // 開啟本地伺服器以接收回調
+            const server = http.createServer(async (req, res) => {
+                try {
+                    if (req.url.indexOf(urlObj.pathname) > -1) {
+                        const qs = new url.URL(req.url, `http://localhost:${port}`).searchParams;
+                        const code = qs.get('code');
+
+                        if (code) {
+                            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                            res.end('<h1>驗證成功！請關閉此頁面並返回 Discord。</h1>');
+
+                            const { tokens } = await oAuth2Client.getToken(code);
+                            oAuth2Client.setCredentials(tokens);
+
+                            server.close();
+                            for (const conn of connections) conn.destroy();
+
+                            await discordService.client.users.cache.get(targetUserId)?.send('✅ **Google 帳號授權成功！** 系統已正式開始運作，會自動監控您的信箱。');
+                            resolve(oAuth2Client);
+                        } else {
+                            res.end('<h1>驗證失敗：找不到驗證碼。</h1>');
+                        }
+                    }
+                } catch (e) {
+                    reject(e);
+                }
+            });
+
+            server.on('connection', (conn) => {
+                connections.add(conn);
+                conn.on('close', () => connections.delete(conn));
+            });
+
+            server.listen(port, () => {
+                this.logger.info(`驗證伺服器已在 port ${port} 啟動，等待您完成授權...`);
+            });
+
+            // 監聽來自使用者的手動輸入網址，防止防他們使用 VPS 無法 redirect back 的情況
+            discordService.client.on('messageCreate', async (message) => {
+                if (message.author.id === targetUserId && message.channel.isDMBased()) {
+                    const text = message.content.trim();
+                    let code = null;
+                    if (text.startsWith('http')) {
+                        try {
+                            const parsed = new url.URL(text);
+                            code = parsed.searchParams.get('code');
+                        } catch (e) { }
+                    } else if (text.length > 20) {
+                        code = text;
+                    }
+
+                    if (code) {
+                        try {
+                            const { tokens } = await oAuth2Client.getToken(code);
+                            oAuth2Client.setCredentials(tokens);
+
+                            server.close();
+                            for (const conn of connections) conn.destroy();
+
+                            await message.reply('✅ **Google 帳號授權手動綁定成功！** 系統已正式開始運作，會自動監控您的信箱。');
+                            resolve(oAuth2Client);
+                        } catch (err) {
+                            await message.reply('❌ 授權碼無效或已過期，請重新索取。');
+                        }
+                    }
+                }
+            });
+        });
     }
 
     async _saveCredentials(client) {
