@@ -60,7 +60,6 @@ class AuthService {
             scope: this.SCOPES,
         });
 
-        // 透過 Discord 發送認證連結
         await discordService.sendAuthMessage(targetUserId, authorizeUrl);
         this.logger.info('已將 Google 授權連結發送至您的 Discord 私訊中，請前往點擊。');
 
@@ -106,7 +105,6 @@ class AuthService {
 
                             await interaction.editReply('✅ **Google 帳號授權成功！** 系統已正式開始運作，會自動監控您的信箱。');
 
-                            // 更新原本的按鈕為已完成
                             const message = interaction.message;
                             if (message && message.components) {
                                 const newComponents = message.components.map(row => {
