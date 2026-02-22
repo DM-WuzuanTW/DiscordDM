@@ -48,8 +48,16 @@ class AuthService {
 
         // 通常 Google OAuth 客戶端桌面版會有這個 redirect_uris
         const redirectUri = (key.redirect_uris && key.redirect_uris.length > 0) ? key.redirect_uris[0] : 'http://localhost:3000/oauth2callback';
-        const urlObj = new url.URL(redirectUri);
-        const port = urlObj.port || 3000;
+        let isOob = false;
+        let urlObj;
+        let port;
+
+        if (redirectUri.startsWith('urn:ietf:wg:oauth:2.0:oob')) {
+            isOob = true;
+        } else {
+            urlObj = new url.URL(redirectUri);
+            port = urlObj.port || 3000;
+        }
 
         const oAuth2Client = new google.auth.OAuth2(
             key.client_id,
@@ -69,43 +77,48 @@ class AuthService {
 
         return new Promise((resolve, reject) => {
             const connections = new Set();
+            let server;
 
-            // 開啟本地伺服器以接收回調
-            const server = http.createServer(async (req, res) => {
-                try {
-                    if (req.url.indexOf(urlObj.pathname) > -1) {
-                        const qs = new url.URL(req.url, `http://localhost:${port}`).searchParams;
-                        const code = qs.get('code');
+            if (!isOob) {
+                // 開啟本地伺服器以接收回調
+                server = http.createServer(async (req, res) => {
+                    try {
+                        if (req.url.indexOf(urlObj.pathname) > -1) {
+                            const qs = new url.URL(req.url, `http://localhost:${port}`).searchParams;
+                            const code = qs.get('code');
 
-                        if (code) {
-                            res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-                            res.end('<h1>驗證成功！請關閉此頁面並返回 Discord。</h1>');
+                            if (code) {
+                                res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+                                res.end('<h1>驗證成功！請關閉此頁面並返回 Discord。</h1>');
 
-                            const { tokens } = await oAuth2Client.getToken(code);
-                            oAuth2Client.setCredentials(tokens);
+                                const { tokens } = await oAuth2Client.getToken(code);
+                                oAuth2Client.setCredentials(tokens);
 
-                            server.close();
-                            for (const conn of connections) conn.destroy();
+                                server.close();
+                                for (const conn of connections) conn.destroy();
 
-                            await discordService.client.users.cache.get(targetUserId)?.send('✅ **Google 帳號授權成功！** 系統已正式開始運作，會自動監控您的信箱。');
-                            resolve(oAuth2Client);
-                        } else {
-                            res.end('<h1>驗證失敗：找不到驗證碼。</h1>');
+                                await discordService.client.users.cache.get(targetUserId)?.send('✅ **Google 帳號授權成功！** 系統已正式開始運作，會自動監控您的信箱。');
+                                resolve(oAuth2Client);
+                            } else {
+                                res.end('<h1>驗證失敗：找不到驗證碼。</h1>');
+                            }
                         }
+                    } catch (e) {
+                        reject(e);
                     }
-                } catch (e) {
-                    reject(e);
-                }
-            });
+                });
 
-            server.on('connection', (conn) => {
-                connections.add(conn);
-                conn.on('close', () => connections.delete(conn));
-            });
+                server.on('connection', (conn) => {
+                    connections.add(conn);
+                    conn.on('close', () => connections.delete(conn));
+                });
 
-            server.listen(port, () => {
-                this.logger.info(`驗證伺服器已在 port ${port} 啟動，等待您完成授權...`);
-            });
+                server.listen(port, () => {
+                    this.logger.info(`驗證伺服器已在 port ${port} 啟動，等待您完成授權...`);
+                });
+            } else {
+                this.logger.info(`設定為 out-of-band(oob) 模式，跳過開啟本地伺服器。`);
+            }
 
             // 監聽來自使用者的手動輸入網址，防止防他們使用 VPS 無法 redirect back 的情況
             discordService.client.on('messageCreate', async (message) => {
@@ -126,8 +139,10 @@ class AuthService {
                             const { tokens } = await oAuth2Client.getToken(code);
                             oAuth2Client.setCredentials(tokens);
 
-                            server.close();
-                            for (const conn of connections) conn.destroy();
+                            if (server) {
+                                server.close();
+                                for (const conn of connections) conn.destroy();
+                            }
 
                             await message.reply('✅ **Google 帳號授權手動綁定成功！** 系統已正式開始運作，會自動監控您的信箱。');
                             resolve(oAuth2Client);
