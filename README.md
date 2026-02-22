@@ -52,6 +52,10 @@ npm run start
 \`\`\`
 第一次啟動時，應用程式會請求您的授權，您需要開啟它提示的網址並選擇您的 Google 帳戶來進行授權，授權成功後會自動產生 `token.json` 於根目錄，未來便不需再次認證。
 
+### 常見問題排解 (Troubleshooting)
+- **遇到 `403 access_denied` 或未核准測試人員：** 如果您的 Google Cloud 專案仍在「測試階段」，請確保您的個人 Gmail 地址已經被加入 OAuth 同意畫面的「測試使用者 (Test users)」清單中。
+- **重新認證：** 若欲更換綁定的帳號或權限過期，直接刪除 `token.json` 後再度啟動 `npm run start` 即可重新授權。
+
 ## 技術棧
 - `discord.js`: 與 Discord API 的無縫連線與互動。
 - `googleapis`: Gmail 與 Google 權限的串接。
